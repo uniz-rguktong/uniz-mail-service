@@ -36,7 +36,8 @@ const baseLaunchBrowser = async (retries = 3) => {
         args: isProduction ? chromium.args : [],
         // @ts-ignore
         defaultViewport: isProduction
-          ? chromium.defaultViewport
+          ? // @ts-ignore
+            chromium.defaultViewport
           : { width: 1200, height: 800 },
         executablePath: execPath,
         // @ts-ignore

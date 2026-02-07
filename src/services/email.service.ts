@@ -344,6 +344,7 @@ export const sendAttendanceReportEmail = async (
       ],
     });
 
+    console.log(`[MAIL] Attendance report sent successfully to ${email}`);
     return true;
   } catch (error: any) {
     console.error(
