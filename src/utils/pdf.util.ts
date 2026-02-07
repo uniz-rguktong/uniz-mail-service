@@ -287,15 +287,11 @@ export const generateAttendancePdf = async (
         r.totalClasses > 0
           ? ((r.attendedClasses / r.totalClasses) * 100).toFixed(1)
           : "0.0";
-      const status = Number(percent) >= 75 ? "GOOD" : "POOR";
-      const statusColor = Number(percent) >= 75 ? "#008000" : "#cc0000";
-
       return `
       <tr>
           <td>${r.subject.name} <br><small style="color:#666">${r.subject.code}</small></td>
           <td class="center">${r.attendedClasses} / ${r.totalClasses}</td>
           <td class="center">${percent}%</td>
-          <td class="center" style="font-weight:bold; color: ${statusColor}">${status}</td>
       </tr>
     `;
     })
@@ -341,7 +337,7 @@ export const generateAttendancePdf = async (
       <div class="results-title">ATTENDANCE REPORT: ${semesterId.toUpperCase()}</div>
       <table class="results-table">
           <thead>
-              <tr><th>Course Title</th><th class="center">Attended / Total</th><th class="center">Percentage</th><th class="center">Status</th></tr>
+              <tr><th>Course Title</th><th class="center">Attended / Total</th><th class="center">Percentage</th></tr>
           </thead>
           <tbody>
               ${rows}
@@ -349,7 +345,6 @@ export const generateAttendancePdf = async (
                   <td style="text-align: right;">OVERALL TOTAL</td>
                   <td class="center">${totalAttended} / ${totalClasses}</td>
                   <td class="center">${overallPercent}%</td>
-                  <td class="center" style="color: ${Number(overallPercent) >= 75 ? "#008000" : "#cc0000"}">${Number(overallPercent) >= 75 ? "GOOD" : "POOR"}</td>
               </tr>
           </tbody>
       </table>
