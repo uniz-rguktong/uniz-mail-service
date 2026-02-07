@@ -1,5 +1,60 @@
 import puppeteer from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
+import fs from "fs";
+
+const getExecutablePath = async () => {
+  const isProduction = process.env.NODE_ENV === "production";
+  if (isProduction) return await chromium.executablePath();
+
+  if (process.env.PUPPETEER_EXECUTABLE_PATH)
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
+
+  const paths = [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "/usr/bin/google-chrome",
+  ];
+
+  for (const path of paths) {
+    if (fs.existsSync(path)) return path;
+  }
+
+  throw new Error(
+    "Could not find a suitable browser for Puppeteer. Please install Google Chrome or Brave Browser.",
+  );
+};
+
+const baseLaunchBrowser = async (retries = 3) => {
+  const isProduction = process.env.NODE_ENV === "production";
+  const execPath = await getExecutablePath();
+
+  for (let i = 0; i < retries; i++) {
+    try {
+      // @ts-ignore
+      return await puppeteer.launch({
+        args: isProduction ? chromium.args : [],
+        // @ts-ignore
+        defaultViewport: isProduction
+          ? chromium.defaultViewport
+          : { width: 1200, height: 800 },
+        executablePath: execPath,
+        // @ts-ignore
+        headless: isProduction ? chromium.headless : true,
+      });
+    } catch (err: any) {
+      if (
+        i < retries - 1 &&
+        (err.code === "ETXTBSY" || err.message.includes("ETXTBSY"))
+      ) {
+        console.warn(`Launch failed (attempt ${i + 1}), retrying in 200ms...`);
+        await new Promise((r) => setTimeout(r, 200));
+      } else {
+        throw err;
+      }
+    }
+  }
+};
 
 export interface ResultData {
   username: string;
@@ -188,46 +243,9 @@ export const generateResultPdf = async (data: ResultData): Promise<Buffer> => {
   `;
 
   let browser;
-  const launchBrowser = async (retries = 3) => {
-    for (let i = 0; i < retries; i++) {
-      try {
-        const isProduction = process.env.NODE_ENV === "production";
-        const execPath = isProduction
-          ? await chromium.executablePath()
-          : process.env.PUPPETEER_EXECUTABLE_PATH ||
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-
-        // @ts-ignore
-        return await puppeteer.launch({
-          args: isProduction ? chromium.args : [],
-          // @ts-ignore
-          defaultViewport: isProduction
-            ? // @ts-ignore
-              chromium.defaultViewport
-            : { width: 1200, height: 800 },
-          executablePath: execPath,
-          // @ts-ignore
-          headless: isProduction ? chromium.headless : true,
-        });
-      } catch (err: any) {
-        if (
-          i < retries - 1 &&
-          (err.code === "ETXTBSY" || err.message.includes("ETXTBSY"))
-        ) {
-          console.warn(
-            `Launch failed (attempt ${i + 1}), retrying in 200ms...`,
-          );
-          await new Promise((r) => setTimeout(r, 200));
-        } else {
-          throw err;
-        }
-      }
-    }
-  };
-
   try {
-    browser = await launchBrowser();
-    if (!browser) throw new Error("Failed to launch browser after retries");
+    browser = await baseLaunchBrowser();
+    if (!browser) throw new Error("Failed to launch browser");
 
     const page = await browser.newPage();
     await page.setContent(html);
@@ -343,46 +361,9 @@ export const generateAttendancePdf = async (
   `;
 
   let browser;
-  const launchBrowser = async (retries = 3) => {
-    for (let i = 0; i < retries; i++) {
-      try {
-        const isProduction = process.env.NODE_ENV === "production";
-        const execPath = isProduction
-          ? await chromium.executablePath()
-          : process.env.PUPPETEER_EXECUTABLE_PATH ||
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-
-        // @ts-ignore
-        return await puppeteer.launch({
-          args: isProduction ? chromium.args : [],
-          // @ts-ignore
-          defaultViewport: isProduction
-            ? // @ts-ignore
-
-              chromium.defaultViewport
-            : { width: 1200, height: 800 },
-          executablePath: execPath,
-          // @ts-ignore
-          headless: isProduction ? chromium.headless : true,
-        });
-      } catch (err: any) {
-        if (
-          i < retries - 1 &&
-          (err.code === "ETXTBSY" || err.message.includes("ETXTBSY"))
-        ) {
-          console.warn(
-            `Launch failed (attempt ${i + 1}), retrying in 200ms...`,
-          );
-          await new Promise((r) => setTimeout(r, 200));
-        } else {
-          throw err;
-        }
-      }
-    }
-  };
-
   try {
-    browser = await launchBrowser();
+    browser = await baseLaunchBrowser();
+    if (!browser) throw new Error("Failed to launch browser");
     const page = await browser!.newPage();
     await page.setContent(html);
     const pdfBuffer = await page.pdf({
