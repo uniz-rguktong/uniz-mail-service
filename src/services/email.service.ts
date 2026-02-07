@@ -6,16 +6,23 @@ import {
   AttendanceData,
 } from "../utils/pdf.util";
 
+const emailUser = process.env.EMAIL_USER;
+const emailPass = process.env.EMAIL_PASS;
+
+if (process.env.NODE_ENV === "production" && (!emailUser || !emailPass)) {
+  throw new Error("EMAIL_USER and EMAIL_PASS are required in production");
+}
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.EMAIL_USER || "noreplycampusschield@gmail.com",
-    pass: process.env.EMAIL_PASS || "acix rfbi kujh xwtj",
+    user: emailUser || "noreplycampusschield@gmail.com",
+    pass: emailPass || "acix rfbi kujh xwtj",
   },
 });
 
 console.log(
-  `[MAIL] Transporter Ready: User=${process.env.EMAIL_USER || "noreplycampusschield@gmail.com"}`,
+  `[MAIL] Transporter Ready: User=${emailUser || "noreplycampusschield@gmail.com"}`,
 );
 
 // Minimal text footer
