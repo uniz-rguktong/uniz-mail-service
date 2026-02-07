@@ -290,7 +290,7 @@ export const sendResultEmail = async (
       html: emailTemplate(content),
       attachments: [
         {
-          filename: `${username}_${semesterId}_Report.pdf`,
+          filename: `ACADEMIC_REPORT_${username}_${semesterId}.pdf`,
           content: pdfBuffer,
           contentType: "application/pdf",
         },
