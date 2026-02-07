@@ -1,5 +1,10 @@
 import nodemailer from "nodemailer";
-import { generateResultPdf, ResultData } from "../utils/pdf.util";
+import {
+  generateResultPdf,
+  ResultData,
+  generateAttendancePdf,
+  AttendanceData,
+} from "../utils/pdf.util";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -295,6 +300,56 @@ export const sendResultEmail = async (
     return true;
   } catch (error: any) {
     console.error(`Failed to send result email to ${email}:`, error.message);
+    return false;
+  }
+};
+
+export const sendAttendanceReportEmail = async (
+  email: string,
+  username: string,
+  name: string,
+  branch: string,
+  campus: string,
+  semesterId: string,
+  records: any[],
+): Promise<boolean> => {
+  try {
+    const content = `
+      Dear ${name},<br><br>
+      The attendance report for <strong>${semesterId}</strong> is now available.<br><br>
+      Please find your detailed attendance record attached to this email.<br><br>
+      You may also view your attendance on the <a href="https://uniz.sreecharandesu.in">UniZ Academics Dashboard</a>.
+    `;
+
+    const pdfBuffer = await generateAttendancePdf({
+      username,
+      name,
+      branch,
+      campus: campus || "RGUKT Ongole",
+      semesterId,
+      records,
+    });
+
+    await transporter.sendMail({
+      from: '"UniZ Academics" <noreplycampusschield@gmail.com>',
+      to: email,
+      subject: `Attendance Report: ${semesterId}`,
+      html: emailTemplate(content),
+      attachments: [
+        {
+          filename: `${username}_Attendance_${semesterId}.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+
+    return true;
+  } catch (error: any) {
+    console.error(
+      `Failed to send attendance email to ${email}:`,
+      error.message,
+    );
     return false;
   }
 };

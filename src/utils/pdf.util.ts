@@ -1,6 +1,5 @@
-
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 
 export interface ResultData {
   username: string;
@@ -18,6 +17,22 @@ export interface ResultData {
   }[];
 }
 
+export interface AttendanceData {
+  username: string;
+  name: string;
+  branch: string;
+  campus: string;
+  semesterId: string;
+  records: {
+    attendedClasses: number;
+    totalClasses: number;
+    subject: {
+      code: string;
+      name: string;
+    };
+  }[];
+}
+
 export const generateResultPdf = async (data: ResultData): Promise<Buffer> => {
   const { name, username, branch, semesterId, grades, campus } = data;
 
@@ -31,11 +46,12 @@ export const generateResultPdf = async (data: ResultData): Promise<Buffer> => {
     // GPA typically includes all credits registered, but let's follow standard
     // If gradePoint is 0 (Remedial), it counts as attempted (credits added) but 0 points.
     if (credit > 0) {
-       earnedPoints += (credit * (gradePoint > 0 ? gradePoint : 0));
+      earnedPoints += credit * (gradePoint > 0 ? gradePoint : 0);
     }
   });
 
-  const sgpa = totalCredits > 0 ? (earnedPoints / totalCredits).toFixed(2) : "0.00";
+  const sgpa =
+    totalCredits > 0 ? (earnedPoints / totalCredits).toFixed(2) : "0.00";
   /* 
     Title Logic:
     1. Try to parse E#S# or P#S# from semesterId (e.g., "E2S1", "AY24-E3-S2")
@@ -43,40 +59,48 @@ export const generateResultPdf = async (data: ResultData): Promise<Buffer> => {
     3. Fallback to raw semesterId
   */
   let titleText = `${semesterId.toUpperCase()} RESULTS`;
-  
+
   // Regex for E1S1, P2S1, E3-S2, etc.
   // Regex for E1S1, P2S1, E3-S2, etc.
   // We decouple Year and Sem extraction to handle cases like "SEM-1" (Year missing)
-  
+
   let yearStr = "";
   let semStr = "";
 
   // 1. Try to extract Year (E1-E4, P1-P2) from semesterId
   const yearMatch = semesterId.match(/([EP])[-_ ]?([1-4])/i);
   if (yearMatch) {
-      yearStr = `${yearMatch[1].toUpperCase()}${yearMatch[2]}`;
+    yearStr = `${yearMatch[1].toUpperCase()}${yearMatch[2]}`;
   }
 
   // 2. Try to extract Semester (S1-S3) from semesterId
   const semMatch = semesterId.match(/S(?:em(?:ester)?)?[-_ ]?([1-3])/i);
   if (semMatch) {
-      semStr = semMatch[1];
+    semStr = semMatch[1];
   }
 
   // 3. Fallback: Infer Year from Subject Code if missing (e.g. CS2101 -> E2)
-  if (!yearStr && grades.length > 0 && grades[0].subject && grades[0].subject.code) {
-      // Matches: First digit after letters (CS2... -> 2)
-      const codeMatch = grades[0].subject.code.match(/^[a-zA-Z]+[-_ ]?([1-4])/);
-      if (codeMatch) {
-          yearStr = `E${codeMatch[1]}`; // Default to Engineering
-      }
+  if (
+    !yearStr &&
+    grades.length > 0 &&
+    grades[0].subject &&
+    grades[0].subject.code
+  ) {
+    // Matches: First digit after letters (CS2... -> 2)
+    const codeMatch = grades[0].subject.code.match(/^[a-zA-Z]+[-_ ]?([1-4])/);
+    if (codeMatch) {
+      yearStr = `E${codeMatch[1]}`; // Default to Engineering
+    }
   }
 
   if (yearStr && semStr) {
-      titleText = `${yearStr} SEMESTER-${semStr} RESULTS`;
+    titleText = `${yearStr} SEMESTER-${semStr} RESULTS`;
   } else {
-      // Fallback if partial info
-      titleText = `${semesterId.toUpperCase()} RESULTS`.replace(' RESULTS RESULTS', ' RESULTS');
+    // Fallback if partial info
+    titleText = `${semesterId.toUpperCase()} RESULTS`.replace(
+      " RESULTS RESULTS",
+      " RESULTS",
+    );
   }
 
   const getGradeLetter = (point: number) => {
@@ -89,15 +113,20 @@ export const generateResultPdf = async (data: ResultData): Promise<Buffer> => {
     return "R";
   };
 
-  const rows = grades.map((g) => `
+  const rows = grades
+    .map(
+      (g) => `
       <tr>
           <td>${g.subject.name}</td>
           <td class="center">${g.subject.credits.toFixed(1)}</td>
           <td class="center">${getGradeLetter(g.grade)}</td>
       </tr>
-  `).join('');
+  `,
+    )
+    .join("");
 
-  const LOGO_URL = "https://res.cloudinary.com/dy2fjgt46/image/upload/v1770094547/rguktongole_logo_tzdkrc.jpg";
+  const LOGO_URL =
+    "https://res.cloudinary.com/dy2fjgt46/image/upload/v1770094547/rguktongole_logo_tzdkrc.jpg";
 
   const html = `
   <!DOCTYPE html>
@@ -162,24 +191,33 @@ export const generateResultPdf = async (data: ResultData): Promise<Buffer> => {
   const launchBrowser = async (retries = 3) => {
     for (let i = 0; i < retries; i++) {
       try {
-        const isProduction = process.env.NODE_ENV === 'production';
-        const execPath = isProduction 
-           ? await chromium.executablePath()
-           : (process.env.PUPPETEER_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
-  
+        const isProduction = process.env.NODE_ENV === "production";
+        const execPath = isProduction
+          ? await chromium.executablePath()
+          : process.env.PUPPETEER_EXECUTABLE_PATH ||
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+
         // @ts-ignore
         return await puppeteer.launch({
-            args: isProduction ? chromium.args : [],
-            // @ts-ignore
-            defaultViewport: isProduction ? chromium.defaultViewport : { width: 1200, height: 800 },
-            executablePath: execPath,
-            // @ts-ignore
-            headless: isProduction ? chromium.headless : true,
+          args: isProduction ? chromium.args : [],
+          // @ts-ignore
+          defaultViewport: isProduction
+            ? // @ts-ignore
+              chromium.defaultViewport
+            : { width: 1200, height: 800 },
+          executablePath: execPath,
+          // @ts-ignore
+          headless: isProduction ? chromium.headless : true,
         });
       } catch (err: any) {
-        if (i < retries - 1 && (err.code === 'ETXTBSY' || err.message.includes('ETXTBSY'))) {
-          console.warn(`Launch failed (attempt ${i + 1}), retrying in 200ms...`);
-          await new Promise(r => setTimeout(r, 200));
+        if (
+          i < retries - 1 &&
+          (err.code === "ETXTBSY" || err.message.includes("ETXTBSY"))
+        ) {
+          console.warn(
+            `Launch failed (attempt ${i + 1}), retrying in 200ms...`,
+          );
+          await new Promise((r) => setTimeout(r, 200));
         } else {
           throw err;
         }
@@ -188,21 +226,173 @@ export const generateResultPdf = async (data: ResultData): Promise<Buffer> => {
   };
 
   try {
-      browser = await launchBrowser();
-      if (!browser) throw new Error("Failed to launch browser after retries");
+    browser = await launchBrowser();
+    if (!browser) throw new Error("Failed to launch browser after retries");
 
-      const page = await browser.newPage();
-      await page.setContent(html);
-      const pdfBuffer = await page.pdf({ 
-        format: 'A4', 
-        printBackground: true,
-        margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' }
-      });
-      return Buffer.from(pdfBuffer);
+    const page = await browser.newPage();
+    await page.setContent(html);
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "20px", bottom: "20px", left: "20px", right: "20px" },
+    });
+    return Buffer.from(pdfBuffer);
   } catch (error) {
-     console.error("Puppeteer Launch Error:", error);
-     throw error;
+    console.error("Puppeteer Launch Error:", error);
+    throw error;
   } finally {
-      if (browser) await browser.close();
+    if (browser) await browser.close();
+  }
+};
+
+export const generateAttendancePdf = async (
+  data: AttendanceData,
+): Promise<Buffer> => {
+  const { name, username, branch, semesterId, records, campus } = data;
+
+  let totalAttended = 0;
+  let totalClasses = 0;
+  records.forEach((r) => {
+    totalAttended += r.attendedClasses;
+    totalClasses += r.totalClasses;
+  });
+
+  const overallPercent =
+    totalClasses > 0
+      ? ((totalAttended / totalClasses) * 100).toFixed(2)
+      : "0.00";
+
+  const rows = records
+    .map((r) => {
+      const percent =
+        r.totalClasses > 0
+          ? ((r.attendedClasses / r.totalClasses) * 100).toFixed(1)
+          : "0.0";
+      const status = Number(percent) >= 75 ? "GOOD" : "POOR";
+      const statusColor = Number(percent) >= 75 ? "#008000" : "#cc0000";
+
+      return `
+      <tr>
+          <td>${r.subject.name} <br><small style="color:#666">${r.subject.code}</small></td>
+          <td class="center">${r.attendedClasses} / ${r.totalClasses}</td>
+          <td class="center">${percent}%</td>
+          <td class="center" style="font-weight:bold; color: ${statusColor}">${status}</td>
+      </tr>
+    `;
+    })
+    .join("");
+
+  const LOGO_URL =
+    "https://res.cloudinary.com/dy2fjgt46/image/upload/v1770094547/rguktongole_logo_tzdkrc.jpg";
+
+  const html = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+  <style>
+      @import url('https://fonts.googleapis.com/css2?family=Times+New+Roman&display=swap');
+      body { font-family: 'Times New Roman', serif; padding: 40px; color: #000; -webkit-print-color-adjust: exact; }
+      .header-container { text-align: center; margin-bottom: 20px; border-bottom: 3px solid #ff9900; padding-bottom: 10px; position: relative; }
+      .logo { width: 80px; position: absolute; left: 0; top: 0; }
+      .uni-name { color: #cc0000; font-size: 24px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; padding-left: 90px; }
+      .sub-name { color: #cc0000; font-size: 11px; font-weight: bold; padding-left: 90px; }
+      .student-info { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 14px; }
+      .student-info td { border: 1px solid #ddd; padding: 8px 12px; }
+      .info-label { font-weight: bold; width: 15%; background-color: #fafafa; }
+      .info-val { width: 35%; font-weight: bold; }
+      .results-title { text-align: center; font-weight: bold; font-size: 18px; margin: 20px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+      .results-table { width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 14px; }
+      .results-table th { border: 1px solid #000; padding: 10px; text-align: left; font-weight: bold; color: #000; background-color: #f2f2f2; }
+      .results-table td { border: 1px solid #000; padding: 8px 10px; }
+      .center { text-align: center; }
+      .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 100px; color: rgba(0, 0, 0, 0.05); z-index: -1; white-space: nowrap; pointer-events: none; }
+  </style>
+  </head>
+  <body>
+      <div class="watermark">RGUKT ${campus.toUpperCase()}</div>
+      <div class="header-container">
+          <img src="${LOGO_URL}" class="logo" alt="RGUKT Logo" />
+          <div class="uni-name">Rajiv Gandhi University of Knowledge Technologies - Andhra Pradesh</div>
+          <div class="sub-name">(Established by the Govt. of Andhra Pradesh and recognized as per Section 2(f), 12(B) of UGC Act, 1956)</div>
+      </div>
+      <table class="student-info">
+          <tr><td class="info-label">ID</td><td class="info-val">${username}</td><td class="info-label">Branch:</td><td class="info-val">${branch}</td></tr>
+          <tr><td class="info-label">Name:</td><td class="info-val">${name}</td><td class="info-label">Campus:</td><td class="info-val">${campus}</td></tr>
+      </table>
+      <div class="results-title">ATTENDANCE REPORT: ${semesterId.toUpperCase()}</div>
+      <table class="results-table">
+          <thead>
+              <tr><th>Course Title</th><th class="center">Attended / Total</th><th class="center">Percentage</th><th class="center">Status</th></tr>
+          </thead>
+          <tbody>
+              ${rows}
+              <tr style="background-color: #f9f9f9; font-weight: bold;">
+                  <td style="text-align: right;">OVERALL TOTAL</td>
+                  <td class="center">${totalAttended} / ${totalClasses}</td>
+                  <td class="center">${overallPercent}%</td>
+                  <td class="center" style="color: ${Number(overallPercent) >= 75 ? "#008000" : "#cc0000"}">${Number(overallPercent) >= 75 ? "GOOD" : "POOR"}</td>
+              </tr>
+          </tbody>
+      </table>
+      <div style="margin-top: 30px; font-size: 12px; color: #666;">
+          * Mandatory 75% attendance is required to appear for examinations.
+          <br>Generated on: ${new Date().toLocaleString()}
+      </div>
+  </body>
+  </html>
+  `;
+
+  let browser;
+  const launchBrowser = async (retries = 3) => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const isProduction = process.env.NODE_ENV === "production";
+        const execPath = isProduction
+          ? await chromium.executablePath()
+          : process.env.PUPPETEER_EXECUTABLE_PATH ||
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+
+        // @ts-ignore
+        return await puppeteer.launch({
+          args: isProduction ? chromium.args : [],
+          // @ts-ignore
+          defaultViewport: isProduction
+            ? chromium.defaultViewport
+            : { width: 1200, height: 800 },
+          executablePath: execPath,
+          // @ts-ignore
+          headless: isProduction ? chromium.headless : true,
+        });
+      } catch (err: any) {
+        if (
+          i < retries - 1 &&
+          (err.code === "ETXTBSY" || err.message.includes("ETXTBSY"))
+        ) {
+          console.warn(
+            `Launch failed (attempt ${i + 1}), retrying in 200ms...`,
+          );
+          await new Promise((r) => setTimeout(r, 200));
+        } else {
+          throw err;
+        }
+      }
+    }
+  };
+
+  try {
+    browser = await launchBrowser();
+    const page = await browser!.newPage();
+    await page.setContent(html);
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "20px", bottom: "20px", left: "20px", right: "20px" },
+    });
+    return Buffer.from(pdfBuffer);
+  } catch (error) {
+    console.error("Puppeteer Launch Error (Attendance):", error);
+    throw error;
+  } finally {
+    if (browser) await browser.close();
   }
 };
